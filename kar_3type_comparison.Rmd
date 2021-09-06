@@ -1,0 +1,134 @@
+---
+title: "Turba Type Statistical Comparison - Ruby with Kar"
+author: "Kar"
+date: "2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1 R libraries
+
+```{r, warning=FALSE}
+library(tidyverse)
+
+```
+
+# 2 Data import
+
+```{r}
+dataset <-read_csv("Dataset.csv") 
+
+```
+
+# 3 Data manipulation
+
+```{r}
+dataset2 <- dataset %>% 
+  select(-Size, -Plant, -Treatment) %>% 
+  mutate(Type = as.factor(Type))
+
+summary(dataset2)
+
+```
+
+# 4 Graph
+
+```{r, fig.width=8, fig.height=8}
+# Set df
+graph_data <- dataset2 %>% 
+  pivot_longer(c(2:10), 
+               names_to = "parameter",
+               values_to = "result")
+
+# x label for sample size
+
+graph_data <- graph_data %>% 
+  group_by(Type, parameter) %>% 
+  mutate(count = n(),
+         x_label = paste(Type, "\n", "(n = ", count, ")")) 
+
+
+# graph
+
+ggplot(graph_data, aes(x = x_label, y = result, fill = Type)) +
+  geom_boxplot(outlier.shape = NA) + 
+  geom_jitter(aes(fill = Type), shape = 21, alpha = 0.5) +
+  facet_wrap(~parameter, scale = "free") +
+  theme_classic() +
+  theme(legend.position = "none") 
+  
+
+```
+
+# 5 Statistical comparison
+
+## 5.1 pH Comparison
+
+*Model building*
+
+```{r}
+# set up df
+
+ph_data <- dataset2[, 1:2]
+
+# ANOVA model
+
+ph_model <- aov(pH ~ Type, data = ph_data)
+summary(ph_model)
+
+```
+
+**Assumption test**
+
+* *Normality test*
+
+Using Shapiro-Wilk test to test for normality of individual groups. Ho is normalily distributed. All three groups have to be having p-value of higher than 0.05.
+
+```{r}
+by(ph_data$pH, ph_data$Type, shapiro.test)
+
+```
+
+* *Levene test*
+
+Apply levene test to find out are groups having equal variances. Ho = equal variances.
+* Result shows that groups have having unequal variances (P-value < 0.05). 
+
+```{r}
+library(DescTools)   # To use Levene test
+
+LeveneTest(ph_data$pH ~ ph_data$Type)
+
+```
+
+**Apply Kruskal-Wallies**
+
+Assumptions of ANOVA are violiated, and therefore Kruskal-wallies is selected as the non-parametric omnibus test to find out whether there is significant differences between groups.
+
+```{r}
+kruskal <- kruskal.test(ph_data$pH ~ ph_data$Type)
+
+kruskal$p.value
+
+```
+**Pos-hoc: Dunn's test **
+
+Dunn.s test is selected as the post hoc test.
+
+```{r}
+library(dunn.test)
+dunn.test(ph_data$pH, ph_data$Type, method = "bonferroni")
+
+```
+
+
+```{r}
+library(DescTools)
+DunnTest(ph_data$pH~ph_data$Type)
+
+```
+
+
